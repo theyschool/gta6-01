@@ -33,6 +33,28 @@ no network requests.
   the kill reads in the frame. Hard braking and drifting leave tire smoke
   and skid marks; a damaged car smokes once it is under half health.
 
+## What's in v2.1
+
+A full-codebase polish pass — every source file reviewed, nothing about how
+the game plays changed:
+
+- **Audio** — the engine now shares one generated noise buffer instead of
+  allocating a new one for every gunshot, punch and music hat hit.
+- **Police** — the SBPD counts its living force once per step instead of
+  re-filtering both unit lists after every spawn.
+- **Saves** — a half-written or hand-edited save can no longer poison the
+  game with NaN cash or coordinates; non-finite values are ignored.
+- **Input** — a punch, car entry or mission start queued in the last moment
+  before the window loses focus no longer fires when you come back, and the
+  resting aim position comes from the same view definition the renderer
+  uses.
+- **Everywhere** — one named `pick` helper for seeded choices, road-grid and
+  lane sizes read from the shared world constants instead of literals, the
+  cash van built to the exact shape every other car has, and a page that
+  describes itself and carries its own icon.
+- **Screenshots** — all four regenerated from the final code and verified
+  byte-identical across two captures, with a clean console.
+
 ## Play
 
 ```sh

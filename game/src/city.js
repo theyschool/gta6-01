@@ -3,6 +3,7 @@
 // here — so the world, the renderer and the minimap all read the same city.
 
 import { DISTRICTS, WORLD } from './config.js';
+import { pick } from './random.js';
 
 const ROAD = WORLD.roadEvery;
 const HALF = WORLD.roadHalf;
@@ -90,12 +91,13 @@ export function createCity(random) {
         });
       } else {
         const lots = district === 'downtown' ? 2 + Math.floor(random() * 2) : 1 + Math.floor(random() * 3);
+        const cols = Math.ceil(Math.sqrt(lots));
+        const rows = Math.ceil(lots / cols);
         for (let lot = 0; lot < lots; lot += 1) {
-          const cols = Math.ceil(Math.sqrt(lots));
           const lx = x0 + ((lot % cols) / cols) * (x1 - x0);
-          const ly = y0 + (Math.floor(lot / cols) / Math.ceil(lots / cols)) * (y1 - y0);
+          const ly = y0 + (Math.floor(lot / cols) / rows) * (y1 - y0);
           const lw = (x1 - x0) / cols - 22;
-          const lh = (y1 - y0) / Math.ceil(lots / cols) - 22;
+          const lh = (y1 - y0) / rows - 22;
           if (lw < 46 || lh < 46) continue;
           const w = 46 + random() * (lw - 46);
           const h = 46 + random() * (lh - 46);
@@ -104,7 +106,7 @@ export function createCity(random) {
             x: lx + 8 + random() * Math.max(0, lw - w - 16),
             y: ly + 8 + random() * Math.max(0, lh - h - 16),
             w, h, height: tall,
-            color: palette[Math.floor(random() * palette.length)],
+            color: pick(random, palette),
             roof: district === 'downtown' ? '#4a5058' : '#8a6f52',
             name: null, kind: 'block', district,
           });

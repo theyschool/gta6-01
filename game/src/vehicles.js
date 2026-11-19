@@ -4,6 +4,7 @@
 
 import { CAR_TYPES, NOS, WORLD } from './config.js';
 import { nearestRoad } from './city.js';
+import { pick } from './random.js';
 
 const ROAD = WORLD.roadEvery;
 const HALF = WORLD.roadHalf;
@@ -27,7 +28,7 @@ export function makeCar(typeKey, x, y, angle, opts = {}) {
     radius: type.radius,
     health: type.health,
     maxHealth: type.health,
-    color: opts.color || colors[Math.floor(rng() * colors.length)],
+    color: opts.color || pick(rng, colors),
     x, y, angle, speed: 0,
     isPolice: typeKey === 'police',
     isTaxi: typeKey === 'taxi',
@@ -51,7 +52,7 @@ export function makeCar(typeKey, x, y, angle, opts = {}) {
 /** A parked car from a city parking spot. */
 export function makeParkedCar(spot, random) {
   const keys = ['sedan', 'hatch', 'sedan', 'van', 'pickup', 'sports', 'muscle', 'hatch'];
-  const key = keys[Math.floor(random() * keys.length)];
+  const key = pick(random, keys);
   const car = makeCar(key, spot.x, spot.y, spot.angle, { occupied: false, rng: random });
   const road = nearestRoad(spot.x, spot.y);
   car.axis = road.axis;
@@ -80,7 +81,7 @@ function carAhead(car, cars, dist) {
   let nearest = null;
   for (let i = 0; i < cars.length; i += 1) {
     const other = cars[i];
-    if (other === car || other.speed === 0 && other.occupied === false) continue;
+    if (other === car || (other.speed === 0 && other.occupied === false)) continue;
     const dx = other.x - car.x;
     const dy = other.y - car.y;
     const along = dx * Math.cos(car.angle) + dy * Math.sin(car.angle);

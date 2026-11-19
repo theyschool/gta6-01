@@ -131,14 +131,20 @@ export function updatePolice(state, dt, random) {
   // not count toward the cruisers the stars demand.
   const wantFoot = stars * POLICE.footPerStar;
   const wantCars = Math.min(POLICE.maxCars, stars * POLICE.carsPerStar);
+  // Count the living force once and keep the tally as units spawn, instead of
+  // re-filtering both lists after every single spawn.
+  let aliveFoot = state.cops.reduce((n, c) => n + (c.health > 0 ? 1 : 0), 0);
   let guard = 0;
-  while (state.cops.filter((c) => c.health > 0).length < wantFoot && guard < 6) {
+  while (aliveFoot < wantFoot && guard < 6) {
     spawnCop(state, random);
+    aliveFoot += 1;
     guard += 1;
   }
+  let chasingCars = state.policeCars.reduce((n, c) => n + (c.health > 0 && !c.roadblock ? 1 : 0), 0);
   guard = 0;
-  while (state.policeCars.filter((c) => c.health > 0 && !c.roadblock).length < wantCars && guard < 4) {
+  while (chasingCars < wantCars && guard < 4) {
     spawnCruiser(state, random);
+    chasingCars += 1;
     guard += 1;
   }
   // The helicopter: up at three stars, gone once the heat is nearly dead.

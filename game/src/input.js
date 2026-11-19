@@ -2,6 +2,8 @@
 // punch, pause, confirm, mute) are queued as edge flags and taken once by the loop, so a press
 // between two frames is never lost and never counted twice. The mouse aims the weapon.
 
+import { AIM_DEFAULT } from './config.js';
+
 export const ACTION_PAUSE = 1;
 export const ACTION_CONFIRM = 2;
 export const ACTION_MUTE = 4;
@@ -22,8 +24,8 @@ const START_MISSION = new Set(['KeyN']);
 export function createInput(canvas) {
   const held = new Set();
   let actions = 0;
-  let mouseX = 640;
-  let mouseY = 360;
+  let mouseX = AIM_DEFAULT.x;
+  let mouseY = AIM_DEFAULT.y;
   let mouseDown = false;
   let startMission = false;
   let enterQueued = false;
@@ -53,6 +55,12 @@ export function createInput(canvas) {
   window.addEventListener('blur', () => {
     held.clear();
     mouseDown = false;
+    // A one-shot press queued in the last moment before the window lost focus
+    // must not fire when the player comes back to the game.
+    enterQueued = false;
+    punchQueued = false;
+    startMission = false;
+    actions = 0;
   });
   canvas.addEventListener('pointermove', (event) => {
     mouseX = event.clientX;

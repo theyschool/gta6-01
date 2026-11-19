@@ -10,3 +10,10 @@ export function createRandom(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** One element of `array`, chosen with `random`: the same single draw the
+ *  hand-written `array[Math.floor(random() * array.length)]` always made,
+ *  named once so every caller picks the same way. */
+export function pick(random, array) {
+  return array[Math.floor(random() * array.length)];
+}

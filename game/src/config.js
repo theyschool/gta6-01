@@ -13,6 +13,10 @@ export const BEST_KEY = 'solara-bay.best.v1';
 /** The playfield the renderer fits to the window; the camera zooms the world into it. */
 export const VIEW = { width: 1280, height: 720 };
 
+/** Where the aim rests before the mouse first moves: the middle of the playfield.
+ *  Input starts here, so the two never disagree about the view's size. */
+export const AIM_DEFAULT = { x: VIEW.width / 2, y: VIEW.height / 2 };
+
 export const PLAYER = {
   walk: 175,
   run: 265,

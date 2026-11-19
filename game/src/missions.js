@@ -3,8 +3,6 @@
 // frame against the world and reports done, failed, or still open. The runner also owns the
 // mission marker the HUD and the minimap point at.
 
-import { ECONOMY } from './config.js';
-
 function dist(ax, ay, bx, by) {
   const dx = ax - bx;
   const dy = ay - by;
@@ -156,12 +154,15 @@ export function spawnCashVan(state) {
   if (van) return;
   const x = state.city.size / 2;
   const y = 1350;
+  // The same shape makeCar builds — NOS tank, boost flag and roadblock flag
+  // included — so any code that reads a car can read the van the same way.
   const created = {
     id: 9000 + Math.floor(state.random() * 100),
     type: 'truck', name: 'Cash Van', top: 300, accel: 280, turn: 2.0, radius: 22,
     health: 200, maxHealth: 200, color: '#2f6d4f', x, y, angle: 0, speed: 0,
     isPolice: false, isTaxi: false, occupied: true, driver: null,
     axis: 'h', dir: 1, cruise: 170, stuck: 0, reverse: 0, smoke: 0, fare: null, isCashVan: true,
+    nos: 1, nosActive: false, roadblock: false,
   };
   state.cars.push(created);
   state.cashVan = created;
@@ -308,5 +309,3 @@ export function remainingReward(state) {
   return MISSIONS.filter((mis) => !state.missions.done.includes(mis.id))
     .reduce((sum, mis) => sum + mis.reward, 0);
 }
-
-export { ECONOMY };

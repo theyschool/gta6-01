@@ -37,7 +37,9 @@ export function saveGame(state) {
 
 export function applySave(state, data) {
   if (!data) return;
-  if (typeof data.cash === 'number') state.cash = data.cash;
+  // Number.isFinite, not typeof: a half-written or hand-edited save can hold NaN,
+  // which typeof calls a number and which would then poison every later save.
+  if (Number.isFinite(data.cash)) state.cash = Math.max(0, data.cash);
   if (Array.isArray(data.missionsDone)) state.missions.done = data.missionsDone;
   if (Array.isArray(data.packageTaken)) {
     for (let i = 0; i < data.packageTaken.length && i < state.city.packages.length; i += 1) {
@@ -45,7 +47,7 @@ export function applySave(state, data) {
     }
   }
   if (data.unlocked) state.unlocked = { ...state.unlocked, ...data.unlocked };
-  if (typeof data.playerX === 'number' && typeof data.playerY === 'number') {
+  if (Number.isFinite(data.playerX) && Number.isFinite(data.playerY)) {
     state.player.x = data.playerX;
     state.player.y = data.playerY;
   }

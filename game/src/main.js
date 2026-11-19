@@ -6,7 +6,7 @@
 // ?seed=N fixes the city's random layout. ?shot=chase|drive|foot|mission (with &seed=N) stages
 // that scene instead of running the loop, paints it twice and sets window.__shotReady.
 
-import { ECONOMY, STEP, VIEW } from './config.js';
+import { ECONOMY, PLAYER, STEP, VIEW } from './config.js';
 import { createRandom } from './random.js';
 import { createWorld } from './world.js';
 import { ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, createInput } from './input.js';
@@ -92,7 +92,7 @@ function runGame() {
 
   function respawn(place, fee, message) {
     state.cash = Math.max(0, state.cash - fee);
-    state.health = 100;
+    state.health = PLAYER.health;
     state.wantedHeat = 0;
     state.wanted = 0;
     state.crimeTimer = 0;

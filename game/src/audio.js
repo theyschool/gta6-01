@@ -33,11 +33,18 @@ export function createAudio() {
     return true;
   }
 
-  function noiseBuffer(seconds) {
-    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
-    return buffer;
+  // One shared second of white noise, generated once. Every burst and hat hit
+  // used to allocate a fresh AudioBuffer — several a second while the music
+  // plays — and now they all play from this one; the callers stop their source
+  // after the length they need, so sharing it changes nothing that is heard.
+  let sharedNoise = null;
+  function noiseBuffer() {
+    if (!sharedNoise) {
+      sharedNoise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const data = sharedNoise.getChannelData(0);
+      for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    }
+    return sharedNoise;
   }
 
   function blip(freq, dur, type, volume, slideTo) {
@@ -61,7 +68,7 @@ export function createAudio() {
     if (!ensure()) return;
     try {
       const src = ctx.createBufferSource();
-      src.buffer = noiseBuffer(dur);
+      src.buffer = noiseBuffer();
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.value = lowpass || 3000;
@@ -72,6 +79,7 @@ export function createAudio() {
       filter.connect(gain);
       gain.connect(master);
       src.start();
+      src.stop(ctx.currentTime + dur + 0.02);
     } catch { /* audio is decoration, never a crash */ }
   }
 
@@ -98,12 +106,13 @@ export function createAudio() {
       }
       if (step % 2 === 0) {
         const src = ctx.createBufferSource();
-        src.buffer = noiseBuffer(0.03);
+        src.buffer = noiseBuffer();
         const gain = ctx.createGain();
         gain.gain.value = step % 8 === 4 ? 0.25 : 0.1;
         src.connect(gain);
         gain.connect(musicGain);
         src.start();
+        src.stop(ctx.currentTime + 0.03);
       }
       step += 1;
       musicTimer = window.setTimeout(tick, stepDur * 1000);

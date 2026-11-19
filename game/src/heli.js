@@ -4,6 +4,15 @@
 
 import { POLICE } from './config.js';
 
+// Where the helicopter flies, relative to the player: it enters behind and
+// above them, then holds a hover point a little closer, and it holds their
+// heat while it is within WATCH_RANGE of them.
+const ENTER_BACK = 200;
+const ENTER_SIDE = 120;
+const HOVER_BACK = 170;
+const HOVER_SIDE = 60;
+const WATCH_RANGE = 900;
+
 function dist(ax, ay, bx, by) {
   const dx = ax - bx;
   const dy = ay - by;
@@ -17,8 +26,8 @@ export function spawnHeli(state) {
   const py = p.car ? p.car.y : p.y;
   const angle = p.car ? p.car.angle : p.angle;
   state.heli = {
-    x: px - Math.cos(angle) * 200 - 120,
-    y: py - Math.sin(angle) * 200 - 120,
+    x: px - Math.cos(angle) * ENTER_BACK - ENTER_SIDE,
+    y: py - Math.sin(angle) * ENTER_BACK - ENTER_SIDE,
     angle,
     rotor: 0,
   };
@@ -34,8 +43,8 @@ export function updateHeli(state, dt) {
   const py = p.car ? p.car.y : p.y;
   const angle = p.car ? p.car.angle : p.angle;
   // Hover behind the player so the spotlight cone falls on them from up-screen.
-  const tx = px - Math.cos(angle) * 170 - 60;
-  const ty = py - Math.sin(angle) * 170 - 60;
+  const tx = px - Math.cos(angle) * HOVER_BACK - HOVER_SIDE;
+  const ty = py - Math.sin(angle) * HOVER_BACK - HOVER_SIDE;
   const dx = tx - h.x;
   const dy = ty - h.y;
   const d = Math.hypot(dx, dy);
@@ -57,5 +66,5 @@ export function heliWatching(state) {
   const p = state.player;
   const px = p.car ? p.car.x : p.x;
   const py = p.car ? p.car.y : p.y;
-  return dist(h.x, h.y, px, py) < 900;
+  return dist(h.x, h.y, px, py) < WATCH_RANGE;
 }
