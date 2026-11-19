@@ -3,8 +3,9 @@
 // cars, the people, the effects, and the HUD with its minimap. Menus are drawn on the canvas
 // too, so a screenshot always shows the game, not a web page.
 
-import { PALETTE, VIEW, WEAPONS, WORLD } from './config.js';
+import { PALETTE, RADIO, VIEW, WEAPONS, WORLD } from './config.js';
 import { missionMarker, missionText, MISSIONS } from './missions.js';
+import { unitCallsign } from './police.js';
 
 export const SCREEN_TITLE = 0;
 export const SCREEN_PLAY = 1;
@@ -80,6 +81,20 @@ export function createRenderer(canvas) {
     ctx.fillRect(Math.max(vx0, 0), Math.max(vy0, city.sandY), Math.min(vx1, city.size) - Math.max(vx0, 0), Math.max(0, Math.min(vy1, city.waterY) - Math.max(vy0, city.sandY)));
     ctx.fillStyle = PALETTE.water;
     ctx.fillRect(Math.max(vx0, 0), Math.max(vy0, city.waterY), Math.min(vx1, city.size) - Math.max(vx0, 0), Math.max(0, vy1 - Math.max(vy0, city.waterY)));
+    // Sunset on the water: a warm band where the sea meets the sand, with shimmer lines.
+    if (vy1 > city.waterY && vy0 < city.waterY + 160) {
+      const sun = ctx.createLinearGradient(0, city.waterY, 0, city.waterY + 150);
+      sun.addColorStop(0, 'rgba(255, 170, 90, 0.34)');
+      sun.addColorStop(1, 'rgba(255, 170, 90, 0)');
+      ctx.fillStyle = sun;
+      ctx.fillRect(Math.max(vx0, 0), city.waterY, Math.min(vx1, city.size) - Math.max(vx0, 0), 150);
+      ctx.fillStyle = 'rgba(255, 205, 130, 0.28)';
+      for (let i = 0; i < 4; i += 1) {
+        const sy = city.waterY + 18 + i * 30;
+        const off = ((i * 271) % 340) - 170;
+        for (let x = Math.floor((vx0 + off) / 180) * 180; x < vx1; x += 180) ctx.fillRect(x, sy, 90 - i * 12, 3);
+      }
+    }
     // Parks.
     ctx.fillStyle = PALETTE.park;
     for (const park of city.parks) {
@@ -127,8 +142,8 @@ export function createRenderer(canvas) {
     const vy1 = camera.y + VIEW.height / 2 / camera.zoom + 120;
     for (const b of city.buildings) {
       if (b.x > vx1 || b.x + b.w < vx0 || b.y > vy1 || b.y + b.h < vy0) continue;
-      const ox = b.height * 0.32;
-      const oy = b.height * 0.32;
+      const ox = b.height * 0.55;
+      const oy = b.height * 0.55;
       // Drop shadow, then the sunlit south and east walls, then the roof.
       ctx.fillStyle = PALETTE.buildingShadow;
       ctx.fillRect(b.x + 8, b.y + 12, b.w, b.h);
@@ -156,6 +171,15 @@ export function createRenderer(canvas) {
       ctx.fillStyle = b.roof;
       ctx.fillRect(b.x + 8, b.y + 8, Math.min(18, b.w / 4), Math.min(14, b.h / 4));
       ctx.fillRect(b.x + b.w - 26, b.y + b.h - 22, Math.min(18, b.w / 4), Math.min(14, b.h / 4));
+      // Golden hour: a few windows glow amber. Positions come from the building's own
+      // coordinates, so the same city always lights the same windows.
+      const lit = 2 + ((b.x * 7 + b.y * 13) % 3);
+      ctx.fillStyle = '#ffb347';
+      for (let i = 0; i < lit; i += 1) {
+        const wx = b.x + 10 + ((b.x * 31 + i * 47) % Math.max(20, b.w - 24));
+        const wy = b.y + 10 + ((b.y * 17 + i * 61) % Math.max(20, b.h - 24));
+        ctx.fillRect(wx, wy, 9, 7);
+      }
       if (b.kind === 'tower') {
         ctx.fillStyle = '#f2c230';
         ctx.fillRect(b.x + b.w / 2 - 14, b.y + b.h / 2 - 14, 28, 28);
@@ -209,6 +233,18 @@ export function createRenderer(canvas) {
     ctx.fillStyle = 'rgba(20, 16, 8, 0.3)';
     ctx.beginPath();
     ctx.ellipse(3, 5, len / 2, wid / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Headlight beam: a warm cone ahead of the car, golden hour's own light.
+    const beam = ctx.createLinearGradient(len / 2, 0, len / 2 + 150, 0);
+    beam.addColorStop(0, 'rgba(255, 230, 160, 0.22)');
+    beam.addColorStop(1, 'rgba(255, 230, 160, 0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(len / 2, -8);
+    ctx.lineTo(len / 2 + 150, -28);
+    ctx.lineTo(len / 2 + 150, 28);
+    ctx.lineTo(len / 2, 8);
+    ctx.closePath();
     ctx.fill();
     // Wheels.
     ctx.fillStyle = '#16181c';
@@ -403,12 +439,98 @@ export function createRenderer(canvas) {
     }
   }
 
+  function drawHeli(state) {
+    const h = state.heli;
+    if (!h) return;
+    const p = state.player;
+    const px = p.car ? p.car.x : p.x;
+    const py = p.car ? p.car.y : p.y;
+    // The spotlight: a wide cone from the helicopter down onto the player.
+    const cone = ctx.createLinearGradient(h.x, h.y, px, py);
+    cone.addColorStop(0, 'rgba(255, 235, 160, 0.16)');
+    cone.addColorStop(1, 'rgba(255, 235, 160, 0.05)');
+    ctx.fillStyle = cone;
+    const ang = Math.atan2(py - h.y, px - h.x);
+    const perp = ang + Math.PI / 2;
+    const spread = 46;
+    ctx.beginPath();
+    ctx.moveTo(h.x, h.y);
+    ctx.lineTo(px + Math.cos(perp) * spread, py + Math.sin(perp) * spread);
+    ctx.lineTo(px - Math.cos(perp) * spread, py - Math.sin(perp) * spread);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 240, 180, 0.20)';
+    ctx.beginPath();
+    ctx.arc(px, py, 52, 0, Math.PI * 2);
+    ctx.fill();
+    // Shadow, offset south-east by the low sun, then the airframe and the rotor blur.
+    ctx.fillStyle = 'rgba(20, 16, 8, 0.30)';
+    ctx.beginPath();
+    ctx.ellipse(h.x + 16, h.y + 20, 30, 16, h.angle, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.angle);
+    ctx.fillStyle = '#20262e';
+    roundRect(ctx, -26, -11, 52, 22, 9);
+    ctx.fill();
+    ctx.fillStyle = '#c8d4de';
+    ctx.beginPath();
+    ctx.arc(12, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#20262e';
+    ctx.fillRect(-40, -3, 16, 6);
+    ctx.fillStyle = '#e5534b';
+    ctx.fillRect(-42, -3, 4, 6);
+    ctx.strokeStyle = 'rgba(230, 235, 240, 0.55)';
+    ctx.lineWidth = 3;
+    const r1 = h.rotor;
+    const r2 = h.rotor + Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(r1) * -34, Math.sin(r1) * -34);
+    ctx.lineTo(Math.cos(r1) * 34, Math.sin(r1) * 34);
+    ctx.moveTo(Math.cos(r2) * -34, Math.sin(r2) * -34);
+    ctx.lineTo(Math.cos(r2) * 34, Math.sin(r2) * 34);
+    ctx.stroke();
+    ctx.fillStyle = '#f2c230';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWrecks(state) {
+    for (const w of state.wrecks) {
+      ctx.save();
+      ctx.translate(w.x, w.y);
+      ctx.rotate(w.angle);
+      ctx.fillStyle = 'rgba(20, 16, 8, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(4, 6, w.radius * 1.2, w.radius * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Burnt husk: blackened body, a flicker of fire still in it.
+      ctx.fillStyle = '#1c1a18';
+      roundRect(ctx, -w.radius * 1.15, -w.radius * 0.75, w.radius * 2.3, w.radius * 1.5, 6);
+      ctx.fill();
+      const flicker = 0.5 + Math.sin(state.time * 9 + w.x) * 0.5;
+      ctx.fillStyle = `rgba(255, ${110 + Math.floor(flicker * 60)}, 40, ${0.35 + flicker * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 6 + flicker * 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawParticles(state) {
     for (const pt of state.particles) {
       const a = Math.max(0, pt.life / pt.max);
       if (pt.kind === 'muzzle') {
         ctx.fillStyle = `rgba(255, 215, 106, ${a})`;
         starPath(ctx, pt.x, pt.y, pt.size * a + 4);
+        ctx.fill();
+      } else if (pt.kind === 'flame') {
+        ctx.fillStyle = `rgba(255, ${140 + Math.floor(a * 80)}, 40, ${a})`;
+        starPath(ctx, pt.x, pt.y, pt.size * a + 3);
         ctx.fill();
       } else if (pt.kind === 'spark') {
         ctx.fillStyle = pt.color;
@@ -493,6 +615,18 @@ export function createRenderer(canvas) {
       ctx.arc(x0 + car.x * scale, y0 + car.y * scale, 3, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.fillStyle = '#ff9f2f';
+    for (const block of state.roadblocks) {
+      ctx.beginPath();
+      ctx.arc(x0 + block.x * scale, y0 + block.y * scale, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (state.heli) {
+      ctx.fillStyle = '#c07bff';
+      ctx.beginPath();
+      ctx.arc(x0 + state.heli.x * scale, y0 + state.heli.y * scale, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // The player, as a white arrow.
     ctx.save();
     ctx.translate(x0 + px * scale, y0 + py * scale);
@@ -525,6 +659,47 @@ export function createRenderer(canvas) {
     if (p.weapon !== 'fists') {
       text(`${WEAPONS[p.weapon].name}  ${p.reload > 0 ? 'RELOADING' : `AMMO ${p.ammo}`}`, 30, 96, 12, PALETTE.hudText, 'left', 700);
     }
+    // Mission panel, under the cash: chapter, stage, and the next step.
+    const m = state.missions;
+    const mission = m.index >= 0 ? MISSIONS[m.index] : MISSIONS[Math.min(m.done.length, MISSIONS.length - 1)];
+    const mStep = m.index >= 0 ? mission.steps[m.step] : null;
+    panel(16, 108, 320, 66);
+    text(m.index >= 0 ? `CH ${mission.title}` : `NEXT — ${mission.title}`, 30, 132, 15, PALETTE.hudGold, 'left', 800);
+    const nextText = m.index >= 0
+      ? `STAGE ${m.step + 1}/${mission.steps.length}  ·  ${mStep ? mStep.text : ''}`
+      : 'Press N to start it, or walk to Vera\'s Garage';
+    text(nextText.length > 46 ? `${nextText.slice(0, 45)}…` : nextText, 30, 154, 12, PALETTE.hudText, 'left', 600);
+    // SBPD RESPONSE: the five nearest units — callsign, distance, status.
+    const pxx = p.car ? p.car.x : p.x;
+    const pyy = p.car ? p.car.y : p.y;
+    const units = [];
+    for (const car of state.policeCars) {
+      if (car.health <= 0) continue;
+      const d = Math.hypot(car.x - pxx, car.y - pyy);
+      units.push({ d, call: unitCallsign(car, 'car'), status: car.roadblock ? 'ROADBLOCK' : d < 130 ? 'RAMMING' : 'PURSUIT', color: car.roadblock ? '#ff9f2f' : d < 130 ? '#e5534b' : '#4aa3ff' });
+    }
+    for (const cop of state.cops) {
+      if (cop.health <= 0) continue;
+      const d = Math.hypot(cop.x - pxx, cop.y - pyy);
+      units.push({ d, call: unitCallsign(cop, 'foot'), status: 'PURSUIT', color: '#4aa3ff' });
+    }
+    if (state.heli) {
+      const d = Math.hypot(state.heli.x - pxx, state.heli.y - pyy);
+      units.push({ d, call: 'AIR-1', status: 'HELI', color: '#c07bff' });
+    }
+    units.sort((a, b) => a.d - b.d);
+    const showUnits = units.slice(0, 5);
+    if (showUnits.length > 0) {
+      const sy = 182;
+      panel(16, sy, 320, 28 + showUnits.length * 19);
+      text(`SBPD RESPONSE — ${showUnits.length} UNIT${showUnits.length === 1 ? '' : 'S'}`, 30, sy + 20, 12, '#ff9f8a', 'left', 800);
+      showUnits.forEach((u, i) => {
+        const ry = sy + 40 + i * 19;
+        text(u.call, 30, ry, 12, PALETTE.hudText, 'left', 700);
+        text(u.status, 120, ry, 12, u.color, 'left', 700);
+        text(`${Math.round(u.d)}m`, 322, ry, 12, PALETTE.hudMuted, 'right', 600);
+      });
+    }
     // Top right: wanted stars and the clock.
     panel(VIEW.width - 256, 14, 240, 62);
     for (let i = 0; i < 5; i += 1) {
@@ -539,6 +714,28 @@ export function createRenderer(canvas) {
     const minutes = Math.floor(state.clock % 60);
     text(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`, VIEW.width - 30, 68, 15, PALETTE.hudText, 'right', 700);
     text(state.wanted > 0 ? 'WANTED' : 'SOLARA BAY', VIEW.width - 30, 40, 11, state.wanted > 0 ? PALETTE.hudDanger : PALETTE.hudMuted, 'right', 700);
+    // Weapon slots, under the wanted stars: the active one is gold, locked ones are dim.
+    const slotDefs = [
+      { key: 'fists', label: 'FISTS', unlocked: true, ammo: '—' },
+      { key: 'pistol', label: 'P9', unlocked: state.unlocked.pistol, ammo: `${WEAPONS.pistol.ammo}` },
+      { key: 'shotgun', label: 'SWEEPER', unlocked: state.unlocked.shotgun, ammo: `${WEAPONS.shotgun.ammo}` },
+    ];
+    panel(VIEW.width - 256, 82, 240, 54);
+    slotDefs.forEach((slot, i) => {
+      const sx = VIEW.width - 246 + i * 78;
+      const active = p.weapon === slot.key;
+      ctx.globalAlpha = slot.unlocked ? 1 : 0.45;
+      ctx.fillStyle = active ? 'rgba(242, 194, 48, 0.22)' : 'rgba(255, 255, 255, 0.07)';
+      roundRect(ctx, sx, 90, 70, 38, 6);
+      ctx.fill();
+      ctx.strokeStyle = active ? '#f2c230' : 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = active ? 2 : 1;
+      roundRect(ctx, sx, 90, 70, 38, 6);
+      ctx.stroke();
+      text(slot.label, sx + 35, 106, 11, active ? '#f2c230' : PALETTE.hudText, 'center', 800);
+      text(slot.unlocked ? (active && p.weapon !== 'fists' ? `AMMO ${p.ammo}` : slot.ammo) : 'LOCKED', sx + 35, 121, 10, PALETTE.hudMuted, 'center', 600);
+      ctx.globalAlpha = 1;
+    });
     // Bottom centre: the mission objective.
     const mText = missionText(state);
     ctx.font = '700 15px system-ui, sans-serif';
@@ -549,19 +746,52 @@ export function createRenderer(canvas) {
     ctx.arc((VIEW.width - tw) / 2 + 20, VIEW.height - 29, 5, 0, Math.PI * 2);
     ctx.fill();
     text(mText, (VIEW.width - tw) / 2 + 32, VIEW.height - 24, 15, PALETTE.hudText, 'left', 700);
-    // Bottom right: speed and the car.
+    // Bottom right: speed and the car, with the NOS meter under the health bar.
     if (p.car) {
-      panel(VIEW.width - 216, VIEW.height - 96, 200, 56);
+      panel(VIEW.width - 216, VIEW.height - 112, 200, 72);
       const mph = Math.round(Math.abs(p.car.speed) * 0.16);
       text(`${mph}`, VIEW.width - 92, VIEW.height - 52, 30, PALETTE.hudText, 'right', 800);
       text('MPH', VIEW.width - 84, VIEW.height - 52, 12, PALETTE.hudMuted, 'left', 700);
       text(p.car.name, VIEW.width - 200, VIEW.height - 52, 13, PALETTE.hudMuted, 'left', 700);
       ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      roundRect(ctx, VIEW.width - 200, VIEW.height - 66, 168, 6, 3);
+      roundRect(ctx, VIEW.width - 200, VIEW.height - 102, 168, 6, 3);
       ctx.fill();
       ctx.fillStyle = p.car.health > 50 ? '#3fae5a' : '#e8a13c';
-      roundRect(ctx, VIEW.width - 200, VIEW.height - 66, 168 * Math.max(0, p.car.health / p.car.maxHealth), 6, 3);
+      roundRect(ctx, VIEW.width - 200, VIEW.height - 102, 168 * Math.max(0, p.car.health / p.car.maxHealth), 6, 3);
       ctx.fill();
+      text('NOS', VIEW.width - 200, VIEW.height - 84, 10, p.car.nosActive ? '#ff9a2f' : PALETTE.hudGold, 'left', 800);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      roundRect(ctx, VIEW.width - 168, VIEW.height - 90, 136, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = p.car.nosActive ? '#ff9a2f' : '#f2c230';
+      roundRect(ctx, VIEW.width - 168, VIEW.height - 90, 136 * Math.max(0, p.car.nos), 6, 3);
+      ctx.fill();
+      if (p.car.nosActive) text('BOOST', VIEW.width - 32, VIEW.height - 84, 10, '#ff9a2f', 'right', 800);
+      // Radio widget, above the speed panel: station, track, and a live equalizer.
+      const track = RADIO.tracks[Math.floor(state.time / RADIO.trackSeconds) % RADIO.tracks.length];
+      panel(VIEW.width - 256, VIEW.height - 172, 240, 52);
+      text(`♪  ${RADIO.station}`, VIEW.width - 242, VIEW.height - 150, 12, PALETTE.hudGold, 'left', 800);
+      for (let i = 0; i < 10; i += 1) {
+        const h = 4 + (Math.sin(state.time * 9 + i * 1.7) * 0.5 + 0.5) * 10;
+        ctx.fillStyle = '#f2c230';
+        ctx.fillRect(VIEW.width - 92 + i * 6, VIEW.height - 158 - h, 3, h);
+      }
+      text(`${track.title} — ${track.artist}`, VIEW.width - 242, VIEW.height - 132, 12, PALETTE.hudText, 'left', 600);
+    }
+    // Vera's dialog box, bottom left above the minimap: she talks when there is a
+    // mission on, or when the heat is up.
+    if (state.wanted >= 2 || m.index >= 0) {
+      const line = state.wanted >= 3
+        ? 'Lose them before the scanner closes.'
+        : m.index >= 0 ? MISSIONS[m.index].briefing : 'Stay out of sight until the heat dies down.';
+      panel(16, 440, 360, 58);
+      ctx.fillStyle = '#7a4fd9';
+      ctx.beginPath();
+      ctx.arc(44, 469, 18, 0, Math.PI * 2);
+      ctx.fill();
+      text('VS', 44, 474, 13, '#ffffff', 'center', 800);
+      text('VERA SOLANO', 72, 461, 12, PALETTE.hudGold, 'left', 800);
+      text(line.length > 44 ? `${line.slice(0, 43)}…` : line, 72, 481, 13, PALETTE.hudText, 'left', 600);
     }
     drawMinimap(state);
     // Toast message.
@@ -631,7 +861,7 @@ export function createRenderer(canvas) {
         text(item, VIEW.width / 2, y0 + i * 52 + 2, 18, '#f2efe4', 'center', 600);
       }
     });
-    text('WASD drive & walk · E steal / exit car · F punch · Mouse aim, click to shoot · Shift run · Space handbrake', VIEW.width / 2, 560, 14, '#c9c2ae', 'center', 500);
+    text('WASD drive & walk · E steal / exit car · F punch · Mouse aim, click to shoot · Shift run / NOS boost in a car · Space handbrake', VIEW.width / 2, 560, 14, '#c9c2ae', 'center', 500);
     text('P pause · N next mission · M mute · your progress saves automatically', VIEW.width / 2, 586, 14, '#c9c2ae', 'center', 500);
   }
 
@@ -669,8 +899,10 @@ export function createRenderer(canvas) {
     camera.y = py;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, VIEW.width, VIEW.height);
-    const shx = state.shake > 0 ? (Math.random() - 0.5) * state.shake : 0;
-    const shy = state.shake > 0 ? (Math.random() - 0.5) * state.shake : 0;
+    // Screen shake: a fixed wobble of the clock, never Math.random, so two runs of the
+    // same seed paint the same frame.
+    const shx = state.shake > 0 ? Math.sin(state.time * 127.1) * state.shake * 0.5 : 0;
+    const shy = state.shake > 0 ? Math.cos(state.time * 149.7) * state.shake * 0.5 : 0;
     ctx.save();
     ctx.translate(VIEW.width / 2 - camera.x * camera.zoom + shx, VIEW.height / 2 - camera.y * camera.zoom + shy);
     ctx.scale(camera.zoom, camera.zoom);
@@ -687,12 +919,14 @@ export function createRenderer(canvas) {
     if (p.onFoot) drawables.push({ y: p.y, f: () => drawPerson(p.x, p.y, p.angle, '#2f9e8f', 0, p.runPhase, true, p.weapon) });
     drawables.sort((a, b) => a.y - b.y);
     for (const d of drawables) d.f();
+    drawWrecks(state);
+    drawHeli(state);
     drawParticles(state);
     ctx.restore();
-    // Golden-hour wash over everything.
+    // Golden-hour wash over everything — stronger now, warm at the bottom of the frame.
     const wash = ctx.createLinearGradient(0, 0, 0, VIEW.height);
-    wash.addColorStop(0, 'rgba(255, 190, 110, 0.05)');
-    wash.addColorStop(1, 'rgba(255, 150, 60, 0.10)');
+    wash.addColorStop(0, 'rgba(255, 190, 110, 0.09)');
+    wash.addColorStop(1, 'rgba(255, 150, 60, 0.18)');
     ctx.fillStyle = wash;
     ctx.fillRect(0, 0, VIEW.width, VIEW.height);
     if (screen === SCREEN_TITLE) drawTitle(state, ui);

@@ -51,6 +51,11 @@ export function createWorld(random) {
     peds: [],
     cops: [],
     policeCars: [],
+    heli: null,
+    roadblocks: [],
+    lastRoadblockAt: -99,
+    wrecks: [],
+    shotBoost: false,
     particles: [],
     skids: [],
     pickups: [],
@@ -112,7 +117,7 @@ export function createWorld(random) {
       y = along;
       angle = dir === 1 ? Math.PI / 2 : -Math.PI / 2;
     }
-    const car = makeCar(key, x, y, angle, { occupied: true, axis: horizontal ? 'h' : 'v', dir });
+    const car = makeCar(key, x, y, angle, { occupied: true, axis: horizontal ? 'h' : 'v', dir, rng: random });
     car.speed = car.cruise * 0.7;
     return car;
   }
@@ -178,6 +183,11 @@ export function createWorld(random) {
     state.peds = [];
     state.cops = [];
     state.policeCars = [];
+    state.heli = null;
+    state.roadblocks = [];
+    state.lastRoadblockAt = -99;
+    state.wrecks = [];
+    state.shotBoost = false;
     state.particles = [];
     state.skids = [];
     state.missions = createMissionRunner();
@@ -379,6 +389,9 @@ export function createWorld(random) {
       car.health = -1000;
       spawnParticles('explosion', car.x, car.y, 26, '#ff7a2f');
       spawnParticles('smoke', car.x, car.y, 12, '#555555');
+      // The wreck stays: a burnt husk with a smoke column, so a kill reads in the frame.
+      state.wrecks.push({ x: car.x, y: car.y, angle: car.angle, color: car.color, radius: car.radius, smokeT: 0 });
+      if (state.wrecks.length > 8) state.wrecks.shift();
       state.shake = Math.min(14, state.shake + 8);
       events.push('explosion');
       if (state.player.car === car) {
@@ -432,7 +445,8 @@ export function createWorld(random) {
       const car = p.car;
       const before = car.speed;
       // W is up on the screen, so forward is -my: up means throttle, down means reverse.
-      driveCar(car, { throttle: -input.my, steer: input.mx, brake: input.brake }, dt);
+      // Shift is NOS in a car (and a sprint on foot): +40% top speed while the tank lasts.
+      driveCar(car, { throttle: -input.my, steer: input.mx, brake: input.brake, boost: input.run }, dt);
       car.x = clamp(car.x, 30, state.city.size - 30);
       car.y = clamp(car.y, 30, state.city.waterY - 40);
       const hit = resolveBuildings(state.city, car, car.radius);
@@ -443,18 +457,36 @@ export function createWorld(random) {
         state.shake = Math.min(10, state.shake + 3);
         events.push('crash');
       }
-      if (input.brake && Math.abs(car.speed) > 160) {
+      // NOS flames from the exhaust, and a little shake, while the boost is on.
+      if (car.nosActive) {
+        const ex = car.x - Math.cos(car.angle) * car.radius * 1.2;
+        const ey = car.y - Math.sin(car.angle) * car.radius * 1.2;
+        state.particles.push({
+          kind: 'flame', x: ex + (random() - 0.5) * 6, y: ey + (random() - 0.5) * 6,
+          vx: -Math.cos(car.angle) * 120, vy: -Math.sin(car.angle) * 120,
+          life: 0.28, max: 0.28, size: 7 + random() * 6, color: '#ff9a2f',
+        });
+        state.shake = Math.max(state.shake, 1.6);
+      }
+      // Tire smoke and skid marks on a hard handbrake stop or a fast drift.
+      const drifting = Math.abs(input.mx) > 0.7 && Math.abs(car.speed) > 300;
+      if ((input.brake && Math.abs(car.speed) > 160) || drifting) {
         const bx = car.x - Math.cos(car.angle) * car.radius;
         const by = car.y - Math.sin(car.angle) * car.radius;
         state.skids.push({ x1: bx, y1: by, x2: bx + Math.cos(car.angle) * car.speed * dt, y2: by + Math.sin(car.angle) * car.speed * dt, life: 9 });
         if (state.skids.length > 420) state.skids.splice(0, state.skids.length - 420);
+        state.particles.push({
+          kind: 'smoke', x: bx + (random() - 0.5) * 10, y: by + (random() - 0.5) * 10,
+          vx: (random() - 0.5) * 30, vy: -20 - random() * 20,
+          life: 0.9, max: 0.9, size: 7 + random() * 5, color: '#9a9a9a',
+        });
       }
       if (car.health <= 0) explodeCar(car, events);
-      else if (car.health < 35) {
+      else if (car.health < car.maxHealth * 0.5) {
         car.smoke += dt;
         if (car.smoke > 0.12) {
           car.smoke = 0;
-          state.particles.push({ kind: 'smoke', x: car.x, y: car.y, vx: (random() - 0.5) * 20, vy: -30, life: 1.2, max: 1.2, size: 8 + random() * 6, color: '#666666' });
+          state.particles.push({ kind: 'smoke', x: car.x, y: car.y, vx: (random() - 0.5) * 20, vy: -30, life: 1.2, max: 1.2, size: 9 + random() * 7, color: '#444444' });
         }
       }
       if (input.enter) toggleCar(events);
@@ -705,6 +737,19 @@ export function createWorld(random) {
         pt.size += 14 * dt;
       }
       if (pt.life <= 0) state.particles.splice(i, 1);
+    }
+    // Wrecks keep smoking: a black column that marks where the kill happened.
+    for (const wreck of state.wrecks) {
+      wreck.smokeT += dt;
+      if (wreck.smokeT > 0.14) {
+        wreck.smokeT = 0;
+        state.particles.push({
+          kind: 'smoke', x: wreck.x + (random() - 0.5) * 14, y: wreck.y + (random() - 0.5) * 10,
+          vx: (random() - 0.5) * 12, vy: -46 - random() * 20,
+          life: 2.4, max: 2.4, size: 10 + random() * 8, color: '#2e2a26',
+        });
+        if (state.particles.length > 320) state.particles.splice(0, state.particles.length - 320);
+      }
     }
     for (let i = state.skids.length - 1; i >= 0; i -= 1) {
       state.skids[i].life -= dt;
