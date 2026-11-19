@@ -4,7 +4,7 @@
 
 import { CAR_TYPES, ECONOMY, PLAYER, STEP, WANTED, WEAPONS, WORLD } from './config.js';
 import { createCity, hitBuilding, inWater, nearestRoad, onRoad, resolveBuildings } from './city.js';
-import { createRandom } from './random.js';
+import { createRandom, pick } from './random.js';
 import { collideCars, driveCar, makeCar, makeParkedCar, updateTrafficCar } from './vehicles.js';
 import { addHeat, updatePolice, wantedStars } from './police.js';
 import { createMissionRunner, missionMarker, startMission, updateMission } from './missions.js';
@@ -103,8 +103,8 @@ export function createWorld(random) {
     const horizontal = random() < 0.5;
     const dir = random() < 0.5 ? 1 : -1;
     const keys = ['sedan', 'hatch', 'sedan', 'van', 'pickup', 'taxi', 'sports', 'muscle'];
-    const key = keys[Math.floor(random() * keys.length)];
-    const lane = 16;
+    const key = pick(random, keys);
+    const lane = WORLD.lane;
     let x;
     let y;
     let angle;
@@ -136,8 +136,8 @@ export function createWorld(random) {
       angle: random() * Math.PI * 2,
       speed: 0,
       health: 30, maxHealth: 30,
-      color: PED_COLORS[Math.floor(random() * PED_COLORS.length)],
-      name: PED_NAMES[Math.floor(random() * PED_NAMES.length)],
+      color: pick(random, PED_COLORS),
+      name: pick(random, PED_NAMES),
       state: 'walk', down: 0, flee: 0,
       targetX: 0, targetY: 0, wait: random() * 2,
       walkPhase: random() * 6,
@@ -240,7 +240,6 @@ export function createWorld(random) {
     if (!best) return;
     if (best.isCashVan && state.missions.index >= 0 && state.missions.index === 7) {
       state.missions.vanTaken = true;
-      state.cash += 0;
       addHeat(state, 30);
       showMessage('You took the money! Now lose the heat and get to the docks.', 5);
       events.push('cash');

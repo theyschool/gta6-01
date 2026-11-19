@@ -3,7 +3,7 @@
 // autopilot the title screen uses, so the frame is what a short game really looks like and the
 // same seed always gives the same frame. Every scene is gameplay with the full HUD — never a menu.
 
-import { STEP } from './config.js';
+import { STEP, WORLD } from './config.js';
 import { nearestRoad } from './city.js';
 import { SCREEN_PLAY } from './render.js';
 import { addHeat, spawnRoadblock } from './police.js';
@@ -36,13 +36,13 @@ function navTarget(state) {
   const road = nearestRoad(car.x, car.y);
   if (road.axis === 'h') {
     const dir = Math.sign(tx - car.x) || 1;
-    if (Math.abs(car.x - tx) > 120) return { x: car.x + dir * 400, y: road.at + dir * 16 };
-    const vx = Math.round(car.x / 450) * 450;
+    if (Math.abs(car.x - tx) > 120) return { x: car.x + dir * 400, y: road.at + dir * WORLD.lane };
+    const vx = Math.round(car.x / WORLD.roadEvery) * WORLD.roadEvery;
     return { x: vx, y: road.at };
   }
   const dir = Math.sign(ty - car.y) || 1;
-  if (Math.abs(car.y - ty) > 120) return { x: road.at - dir * 16, y: car.y + dir * 400 };
-  const hy = Math.round(car.y / 450) * 450;
+  if (Math.abs(car.y - ty) > 120) return { x: road.at - dir * WORLD.lane, y: car.y + dir * 400 };
+  const hy = Math.round(car.y / WORLD.roadEvery) * WORLD.roadEvery;
   return { x: road.at, y: hy };
 }
 
@@ -87,10 +87,10 @@ export function autopilotInput(state) {
     let overtake = null;
     if (road.axis === 'h') {
       const dir = Math.sign(target.x - car.x) || 1;
-      overtake = { x: car.x + dir * 200, y: road.at - dir * 16 };
+      overtake = { x: car.x + dir * 200, y: road.at - dir * WORLD.lane };
     } else {
       const dir = Math.sign(target.y - car.y) || 1;
-      overtake = { x: road.at + dir * 16, y: car.y + dir * 200 };
+      overtake = { x: road.at + dir * WORLD.lane, y: car.y + dir * 200 };
     }
     let clear = true;
     for (const other of state.cars) {

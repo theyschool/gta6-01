@@ -3,7 +3,7 @@
 // cars, the people, the effects, and the HUD with its minimap. Menus are drawn on the canvas
 // too, so a screenshot always shows the game, not a web page.
 
-import { PALETTE, RADIO, VIEW, WEAPONS, WORLD } from './config.js';
+import { FONT, PALETTE, RADIO, VIEW, WEAPONS, WORLD } from './config.js';
 import { missionMarker, missionText, MISSIONS } from './missions.js';
 import { unitCallsign } from './police.js';
 
@@ -55,7 +55,7 @@ export function createRenderer(canvas) {
   window.addEventListener('resize', resize);
 
   function text(str, x, y, size, color, align, weight) {
-    ctx.font = `${weight || 600} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    ctx.font = `${weight || 600} ${size}px ${FONT}`;
     ctx.textAlign = align || 'left';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = color;
