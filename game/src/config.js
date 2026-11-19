@@ -56,7 +56,7 @@ export const WANTED = {
 export const POLICE = {
   footPerStar: 2,
   carsPerStar: 1,
-  maxCars: 4,
+  maxCars: 6,
   copHealth: 60,
   copSpeed: 235,
   bustSeconds: 1.6,
@@ -64,6 +64,28 @@ export const POLICE = {
   shootRange: 340,
   shootDamage: 7,
   shootInterval: 0.9,
+  heliAtStars: 3,
+  heliSpeed: 560,
+  roadblockAtStars: 3,
+  roadblockAhead: 430,
+};
+
+/** NOS boost: +40% top speed while held, about three seconds of juice per fill. */
+export const NOS = {
+  boostMult: 1.4,
+  drainPerSecond: 1 / 3,
+  rechargePerSecond: 0.06,
+};
+
+/** The radio: three tracks the DJ cycles through, thirty seconds each. */
+export const RADIO = {
+  station: 'WAVE 88.1',
+  tracks: [
+    { title: 'Neon Drive', artist: 'Pink Horizon' },
+    { title: 'Midnight Marina', artist: 'Coastline' },
+    { title: 'Sunset Strip', artist: 'Vega Ray' },
+  ],
+  trackSeconds: 30,
 };
 
 export const ECONOMY = {
@@ -77,14 +99,14 @@ export const ECONOMY = {
 };
 
 export const PALETTE = {
-  grass: '#79a75c',
-  grassDry: '#8fae62',
-  park: '#5f9e4d',
-  sand: '#e3cf9e',
-  water: '#2b7d9e',
+  grass: '#9aa84f',
+  grassDry: '#b3a05a',
+  park: '#6f9a44',
+  sand: '#e8c88f',
+  water: '#2f7f9b',
   waterDeep: '#1f5f7d',
-  sidewalk: '#b9b2a2',
-  asphalt: '#3b4048',
+  sidewalk: '#c2b096',
+  asphalt: '#453f3a',
   asphaltLine: '#e8d44d',
   curb: '#8f887a',
   buildingShadow: 'rgba(20, 16, 8, 0.35)',

@@ -14,6 +14,25 @@ wanted levels, work eight story missions for the fixer Vera Solano, drive taxi
 fares, and collect hidden packages — all in plain 2D canvas, no build step,
 no network requests.
 
+## What's in v2
+
+- **Police helicopter** — at three stars and up, an SBPD helicopter hangs over
+  you with its spotlight on you, and the heat barely cools while it watches.
+- **Roadblocks** — at three stars and up, two cruisers park across the road
+  ahead of you, lights flashing. Ram them, dodge them, or turn off.
+- **NOS boost** — hold Shift in a car for +40% top speed, about three seconds
+  a tank, with exhaust flames, screen shake, and a NOS meter on the speed
+  panel. The tank refills slowly when you are not boosting.
+- **Golden hour, stronger** — warmer grass and asphalt, sunset shimmer on the
+  sea, amber windows, longer building shadows, and headlight beams.
+- **Denser HUD** — an SBPD RESPONSE panel listing the nearest units with
+  callsign, distance and status; a WAVE 88.1 radio widget with a live
+  equalizer; weapon slots; a mission panel; and Vera Solano talking you
+  through the chase from the bottom-left corner.
+- **Wrecks that stay** — a car you destroy burns out and keeps smoking, so
+  the kill reads in the frame. Hard braking and drifting leave tire smoke
+  and skid marks; a damaged car smokes once it is under half health.
+
 ## Play
 
 ```sh

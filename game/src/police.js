@@ -5,6 +5,7 @@
 import { POLICE, WANTED } from './config.js';
 import { makeCar, driveCar } from './vehicles.js';
 import { nearestRoad, onRoad, resolveBuildings } from './city.js';
+import { heliWatching, spawnHeli, updateHeli } from './heli.js';
 
 function dist(ax, ay, bx, by) {
   const dx = ax - bx;
@@ -50,11 +51,60 @@ function spawnCop(state, random) {
 function spawnCruiser(state, random) {
   const at = spawnPoint(state, random);
   const road = nearestRoad(at.x, at.y);
-  const car = makeCar('police', at.x, at.y, road.axis === 'h' ? 0 : Math.PI / 2, { occupied: true });
+  const car = makeCar('police', at.x, at.y, road.axis === 'h' ? 0 : Math.PI / 2, { occupied: true, rng: random });
   car.axis = road.axis;
   car.dir = 1;
   state.cars.push(car);
   state.policeCars.push(car);
+}
+
+/** A roadblock: two cruisers parked across the road ahead of the player, lights flashing. */
+export function spawnRoadblock(state, random) {
+  const p = state.player;
+  const car = p.car;
+  if (!car) return null;
+  const road = nearestRoad(car.x, car.y);
+  const fx = Math.cos(car.angle);
+  const fy = Math.sin(car.angle);
+  let cx = car.x + fx * POLICE.roadblockAhead;
+  let cy = car.y + fy * POLICE.roadblockAhead;
+  if (road.axis === 'h') cy = road.at;
+  else cx = road.at;
+  cx = Math.max(80, Math.min(state.city.size - 80, cx));
+  cy = Math.max(80, Math.min(state.city.waterY - 80, cy));
+  const perp = road.axis === 'h' ? Math.PI / 2 : 0;
+  const block = { x: cx, y: cy, angle: perp, cars: [] };
+  for (const off of [-27, 27]) {
+    const bx = road.axis === 'h' ? cx + off : cx;
+    const by = road.axis === 'h' ? cy : cy + off;
+    const cruiser = makeCar('police', bx, by, perp, { occupied: true, rng: random });
+    cruiser.roadblock = true;
+    cruiser.speed = 0;
+    state.cars.push(cruiser);
+    state.policeCars.push(cruiser);
+    block.cars.push(cruiser);
+  }
+  state.roadblocks.push(block);
+  return block;
+}
+
+function removeRoadblock(state, block) {
+  for (const cruiser of block.cars) {
+    const i = state.cars.indexOf(cruiser);
+    if (i >= 0) state.cars.splice(i, 1);
+    const pi = state.policeCars.indexOf(cruiser);
+    if (pi >= 0) state.policeCars.splice(pi, 1);
+  }
+  const i = state.roadblocks.indexOf(block);
+  if (i >= 0) state.roadblocks.splice(i, 1);
+}
+
+/** The radio callsign a unit answers to: stable for a unit, distinct between units. */
+export function unitCallsign(unit, kind) {
+  if (kind === 'heli') return 'AIR-1';
+  const n = 10 + (Math.abs(unit.id || 0) % 89);
+  if (kind === 'foot') return `UNIT-${n}`;
+  return `IBIS-${n}`;
 }
 
 export function wantedStars(heat) {
@@ -77,7 +127,8 @@ export function updatePolice(state, dt, random) {
   const py = p.car ? p.car.y : p.y;
   const stars = state.wanted;
 
-  // Force size follows the stars.
+  // Force size follows the stars. Roadblock cars are parked, not chasing, so they do
+  // not count toward the cruisers the stars demand.
   const wantFoot = stars * POLICE.footPerStar;
   const wantCars = Math.min(POLICE.maxCars, stars * POLICE.carsPerStar);
   let guard = 0;
@@ -86,9 +137,28 @@ export function updatePolice(state, dt, random) {
     guard += 1;
   }
   guard = 0;
-  while (state.policeCars.filter((c) => c.health > 0).length < wantCars && guard < 4) {
+  while (state.policeCars.filter((c) => c.health > 0 && !c.roadblock).length < wantCars && guard < 4) {
     spawnCruiser(state, random);
     guard += 1;
+  }
+  // The helicopter: up at three stars, gone once the heat is nearly dead.
+  if (stars >= POLICE.heliAtStars && !state.heli) spawnHeli(state);
+  updateHeli(state, dt);
+  // A roadblock ahead of the player while the heat is high: the player has to ram it,
+  // dodge it, or turn off. One at a time, and never on top of the last one.
+  if (stars >= POLICE.roadblockAtStars && p.car) {
+    const near = state.roadblocks.some((b) => dist(b.x, b.y, px, py) < 900);
+    if (!near && state.time - (state.lastRoadblockAt || -99) > 10) {
+      if (spawnRoadblock(state, random)) state.lastRoadblockAt = state.time;
+    }
+  }
+  for (let i = state.roadblocks.length - 1; i >= 0; i -= 1) {
+    const block = state.roadblocks[i];
+    const behind = (block.x - px) * Math.cos(p.car ? p.car.angle : p.angle)
+      + (block.y - py) * Math.sin(p.car ? p.car.angle : p.angle);
+    if (stars < POLICE.roadblockAtStars || dist(block.x, block.y, px, py) > 1400 || behind < -500) {
+      removeRoadblock(state, block);
+    }
   }
   // Cops too far away give up and despawn; cruisers far away are towed off too.
   state.cops = state.cops.filter((c) => c.health > 0 && dist(c.x, c.y, px, py) < 1400);
@@ -136,8 +206,9 @@ export function updatePolice(state, dt, random) {
   }
 
   // Cruisers: steer straight at the player and ram; if they get stuck, back out and retry.
+  // Roadblock cars stay parked where they are.
   for (const car of state.policeCars) {
-    if (car.health <= 0) continue;
+    if (car.health <= 0 || car.roadblock) continue;
     const d = dist(car.x, car.y, px, py);
     const wantAngle = Math.atan2(py - car.y, px - car.x);
     const diff = angleDiff(wantAngle, car.angle);
@@ -176,7 +247,8 @@ export function updatePolice(state, dt, random) {
     }
   }
 
-  // Heat cools when no cop is close and nothing criminal just happened.
+  // Heat cools when no cop is close and nothing criminal just happened — unless the
+  // helicopter is overhead watching, in which case it barely cools at all.
   const nearestCop = Math.min(
     ...state.cops.map((c) => dist(c.x, c.y, px, py)),
     ...state.policeCars.map((c) => dist(c.x, c.y, px, py)),
@@ -185,7 +257,8 @@ export function updatePolice(state, dt, random) {
   if (state.crimeTimer > 0) state.crimeTimer -= dt;
   else if (state.wantedHeat > 0) {
     const rate = nearestCop > 520 ? WANTED.decayHiddenPerSecond : WANTED.decayPerSecond;
-    state.wantedHeat = Math.max(0, state.wantedHeat - rate * dt);
+    const held = heliWatching(state) ? rate * 0.15 : rate;
+    state.wantedHeat = Math.max(0, state.wantedHeat - held * dt);
     state.wanted = wantedStars(state.wantedHeat);
   }
   return events;

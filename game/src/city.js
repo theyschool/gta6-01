@@ -56,7 +56,7 @@ export function createCity(random) {
     '5,3': { name: 'General Hospital', kind: 'hospital', color: '#e8e4da', height: 26 },
     '4,2': { name: 'Police HQ', kind: 'police', color: '#3f5a78', height: 30 },
     '4,3': { name: 'Solara Tower', kind: 'tower', color: '#5f7285', height: 92 },
-    '6,7': { name: 'The Docks', kind: 'docks', color: '#7a6f66', height: 18 },
+    '6,6': { name: 'The Docks', kind: 'docks', color: '#7a6f66', height: 18 },
   };
 
   for (let bx = 0; bx < 8; bx += 1) {

@@ -157,7 +157,7 @@ export function spawnCashVan(state) {
   const x = state.city.size / 2;
   const y = 1350;
   const created = {
-    id: 9000 + Math.floor(Math.random() * 100),
+    id: 9000 + Math.floor(state.random() * 100),
     type: 'truck', name: 'Cash Van', top: 300, accel: 280, turn: 2.0, radius: 22,
     health: 200, maxHealth: 200, color: '#2f6d4f', x, y, angle: 0, speed: 0,
     isPolice: false, isTaxi: false, occupied: true, driver: null,
@@ -174,7 +174,7 @@ export function spawnDebtors(state) {
       x: 600 + i * 220, y: 1750 + (i % 2) * 140,
       angle: 0, speed: 0, health: 60, maxHealth: 60,
       color: ['#c0392b', '#8e44ad', '#d35400'][i],
-      state: 'debtor', down: 0, flee: 0, walkPhase: Math.random() * 6,
+      state: 'debtor', down: 0, flee: 0, walkPhase: state.random() * 6,
       targetX: 0, targetY: 0, wait: 0,
     });
   }
